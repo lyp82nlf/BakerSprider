@@ -36,6 +36,9 @@ class Config:
     api_url: str
     api_key: str
     wecom_webhook_url: str
+    request_timeout_seconds: int
+    request_retries: int
+    request_retry_delay_seconds: float
     fetch_interval_seconds: int
     rate_threshold_points: float
     only_active: bool
@@ -55,6 +58,9 @@ class Config:
             api_url=os.getenv("BARKER_API_URL", DEFAULT_API_URL),
             api_key=os.getenv("BARKER_API_KEY", ""),
             wecom_webhook_url=os.getenv("WECOM_WEBHOOK_URL", ""),
+            request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "45")),
+            request_retries=int(os.getenv("REQUEST_RETRIES", "3")),
+            request_retry_delay_seconds=float(os.getenv("REQUEST_RETRY_DELAY_SECONDS", "5")),
             fetch_interval_seconds=int(os.getenv("FETCH_INTERVAL_SECONDS", "300")),
             rate_threshold_points=float(os.getenv("RATE_THRESHOLD_POINTS", "1.0")),
             only_active=_bool_env("ONLY_ACTIVE", True),

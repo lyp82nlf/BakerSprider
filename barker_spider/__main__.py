@@ -6,7 +6,7 @@ import sys
 import time
 from datetime import datetime
 
-from .client import BarkerClient
+from .client import BarkerClient, BarkerClientError
 from .config import Config
 from .daily_report import LOCAL_TZ, build_daily_report, format_daily_report_markdown, should_send_daily_report
 from .monitor import run_comparison
@@ -68,6 +68,8 @@ def run_forever(config: Config, dry_run: bool = False) -> int:
     while True:
         try:
             run_once(config, dry_run=dry_run)
+        except BarkerClientError as exc:
+            logging.warning("Monitor iteration skipped: %s", exc)
         except Exception:
             logging.exception("Monitor iteration failed")
         time.sleep(config.fetch_interval_seconds)
@@ -78,7 +80,7 @@ def run_once(config: Config, dry_run: bool = False) -> int:
     if not dry_run:
         config.validate_for_notify()
 
-    client = BarkerClient(config.api_url, config.api_key)
+    client = build_client(config)
     state = CampaignState(config.state_path)
     history = CampaignHistory(config.history_path)
 
@@ -134,7 +136,7 @@ def list_campaigns(config: Config, refresh: bool = False) -> int:
     state = CampaignState(config.state_path)
     if refresh:
         config.validate_for_fetch()
-        client = BarkerClient(config.api_url, config.api_key)
+        client = build_client(config)
         campaigns = normalize_campaigns(client.fetch_campaigns(), only_active=config.only_active)
         state.save(campaigns)
 
@@ -149,7 +151,7 @@ def list_campaigns(config: Config, refresh: bool = False) -> int:
 
 def raw_list(config: Config) -> int:
     config.validate_for_fetch()
-    client = BarkerClient(config.api_url, config.api_key)
+    client = build_client(config)
     print(format_raw_campaign_table(client.fetch_campaigns()))
     return 0
 
@@ -161,7 +163,7 @@ def send_daily_report(config: Config, dry_run: bool = False, refresh: bool = Fal
     state = CampaignState(config.state_path)
     if refresh:
         config.validate_for_fetch()
-        client = BarkerClient(config.api_url, config.api_key)
+        client = build_client(config)
         campaigns = normalize_campaigns(client.fetch_campaigns(), only_active=config.only_active)
         CampaignHistory(config.history_path).append_snapshot(datetime.now(LOCAL_TZ).isoformat(), campaigns)
         state.save(campaigns)
@@ -192,6 +194,16 @@ def build_daily_report_content(config: Config, campaigns: list, now: datetime) -
         report,
         change_threshold_points=config.daily_rate_change_threshold_points,
         high_apy_threshold=config.daily_high_apy_threshold,
+    )
+
+
+def build_client(config: Config) -> BarkerClient:
+    return BarkerClient(
+        config.api_url,
+        config.api_key,
+        timeout_seconds=config.request_timeout_seconds,
+        retries=config.request_retries,
+        retry_delay_seconds=config.request_retry_delay_seconds,
     )
 
 
