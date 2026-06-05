@@ -83,7 +83,23 @@ class DailyReportTest(unittest.TestCase):
 
         self.assertIn("Barker 理财日报", content)
         self.assertIn("8.00% -> 10.00%", content)
-        self.assertIn("当前利率超过 8.00%", content)
+        self.assertIn("当前 APY > 8.00%", content)
+
+    def test_limits_daily_report_items(self) -> None:
+        now = datetime(2026, 6, 5, 10, 0, tzinfo=LOCAL_TZ)
+        current_campaigns = [campaign(f"high-{index}", 9.0 + index, f"High {index}") for index in range(12)]
+        report = build_daily_report(
+            snapshots=[],
+            current_campaigns=current_campaigns,
+            now=now,
+            change_threshold_points=2.0,
+            high_apy_threshold=8.0,
+        )
+
+        content = format_daily_report_markdown(report, 2.0, 8.0)
+
+        self.assertIn("当前 APY > 8.00%：12 条", content)
+        self.assertIn("... 还有 2 条未展示", content)
 
 
 if __name__ == "__main__":

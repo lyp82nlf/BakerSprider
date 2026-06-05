@@ -9,6 +9,7 @@ from .models import Campaign
 from .notifier import format_apy
 
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+MAX_DAILY_REPORT_ITEMS = 10
 
 
 @dataclass(frozen=True)
@@ -59,32 +60,41 @@ def build_daily_report(
 
 
 def format_daily_report_markdown(report: DailyReport, change_threshold_points: float, high_apy_threshold: float) -> str:
-    lines = [f"### Barker 理财日报（{report.report_date.isoformat()}）"]
+    lines = [f"### Barker 理财日报 {report.report_date.isoformat()}"]
 
     lines.append("")
-    lines.append(f"**昨日利率涨跌达到 {change_threshold_points:.2f} 个百分点**")
+    lines.append(f"**昨日涨跌 >= {change_threshold_points:.2f} 个百分点：{len(report.rate_moves)} 条**")
     if report.rate_moves:
-        for move in report.rate_moves:
+        shown_moves = report.rate_moves[:MAX_DAILY_REPORT_ITEMS]
+        for index, move in enumerate(shown_moves, start=1):
             direction = "上涨" if move.delta > 0 else "下跌"
+            lines.append(f"{index}. {move.campaign.protocol_name}｜{move.campaign.campaign_name}")
             lines.append(
-                f"- {move.campaign.protocol_name}｜{move.campaign.campaign_name}｜{move.campaign.asset_symbol}："
-                f"{move.start_apy:.2f}% -> {move.end_apy:.2f}%（{direction} {abs(move.delta):.2f} 个百分点）"
+                f"   {move.campaign.asset_symbol}｜{move.start_apy:.2f}% -> {move.end_apy:.2f}%"
+                f"｜{direction} {abs(move.delta):.2f}pct"
             )
+        lines.extend(_remaining_line(len(report.rate_moves), len(shown_moves)))
     else:
         lines.append("- 无")
 
     lines.append("")
-    lines.append(f"**当前利率超过 {high_apy_threshold:.2f}%**")
+    lines.append(f"**当前 APY > {high_apy_threshold:.2f}%：{len(report.high_apy_campaigns)} 条**")
     if report.high_apy_campaigns:
-        for campaign in report.high_apy_campaigns:
-            lines.append(
-                f"- {campaign.protocol_name}｜{campaign.campaign_name}｜{campaign.asset_symbol}："
-                f"{format_apy(campaign)}；到期：{campaign.end_date}"
-            )
+        shown_campaigns = report.high_apy_campaigns[:MAX_DAILY_REPORT_ITEMS]
+        for index, campaign in enumerate(shown_campaigns, start=1):
+            lines.append(f"{index}. {campaign.protocol_name}｜{campaign.campaign_name}")
+            lines.append(f"   {campaign.asset_symbol}｜APY {format_apy(campaign)}｜到期 {campaign.end_date}")
+        lines.extend(_remaining_line(len(report.high_apy_campaigns), len(shown_campaigns)))
     else:
         lines.append("- 无")
 
     return "\n".join(lines)
+
+
+def _remaining_line(total: int, shown: int) -> list[str]:
+    if total <= shown:
+        return []
+    return [f"... 还有 {total - shown} 条未展示"]
 
 
 def _snapshots_for_date(snapshots: list[dict[str, Any]], target_date: date) -> list[dict[str, Any]]:

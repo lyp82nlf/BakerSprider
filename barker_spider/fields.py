@@ -33,6 +33,8 @@ def display_end_date(value: str) -> str:
     text = str(value).strip()
     if not text or text == "-":
         return "长期"
+    if "T" not in text and not text.endswith("Z"):
+        return text
 
     parsed = _parse_iso_datetime(text)
     if parsed is None:

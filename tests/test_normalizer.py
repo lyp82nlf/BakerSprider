@@ -42,6 +42,23 @@ class NormalizerTest(unittest.TestCase):
 
         self.assertEqual([campaign.uid for campaign in campaigns], ["active"])
 
+    def test_keeps_already_displayed_end_date(self) -> None:
+        campaigns = normalize_campaigns(
+            [
+                {
+                    "pool_uid": "pool-1",
+                    "protocol_uid": "binance",
+                    "campaign_name": "U",
+                    "asset_symbol": "U",
+                    "end_date": "2026-06-19 07:59",
+                    "campaign_apy": "0.08",
+                    "is_active": 1,
+                }
+            ]
+        )
+
+        self.assertEqual(campaigns[0].end_date, "2026-06-19 07:59")
+
 
 if __name__ == "__main__":
     unittest.main()
