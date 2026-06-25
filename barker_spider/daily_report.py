@@ -6,7 +6,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .models import Campaign
-from .notifier import format_apy
+from .notifier import COLOR_HIGH, colored, format_apy, format_percent, rate_change_color
 
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 MAX_DAILY_REPORT_ITEMS = 10
@@ -68,10 +68,12 @@ def format_daily_report_markdown(report: DailyReport, change_threshold_points: f
         shown_moves = report.rate_moves[:MAX_DAILY_REPORT_ITEMS]
         for index, move in enumerate(shown_moves, start=1):
             direction = "上涨" if move.delta > 0 else "下跌"
+            color = rate_change_color(move.delta)
             lines.append(f"{index}. {move.campaign.protocol_name}｜{move.campaign.campaign_name}")
             lines.append(
-                f"   {move.campaign.asset_symbol}｜{move.start_apy:.2f}% -> {move.end_apy:.2f}%"
-                f"｜{direction} {abs(move.delta):.2f}pct"
+                f"   {move.campaign.asset_symbol}｜{format_percent(move.start_apy)} -> "
+                f"{colored(format_percent(move.end_apy), color)}"
+                f"｜{colored(f'{direction} {abs(move.delta):.2f}pct', color)}"
             )
         lines.extend(_remaining_line(len(report.rate_moves), len(shown_moves)))
     else:
@@ -83,7 +85,7 @@ def format_daily_report_markdown(report: DailyReport, change_threshold_points: f
         shown_campaigns = report.high_apy_campaigns[:MAX_DAILY_REPORT_ITEMS]
         for index, campaign in enumerate(shown_campaigns, start=1):
             lines.append(f"{index}. {campaign.protocol_name}｜{campaign.campaign_name}")
-            lines.append(f"   {campaign.asset_symbol}｜APY {format_apy(campaign)}｜到期 {campaign.end_date}")
+            lines.append(f"   {campaign.asset_symbol}｜APY {colored(format_apy(campaign), COLOR_HIGH)}｜到期 {campaign.end_date}")
         lines.extend(_remaining_line(len(report.high_apy_campaigns), len(shown_campaigns)))
     else:
         lines.append("- 无")

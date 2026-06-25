@@ -6,6 +6,10 @@ from urllib.request import Request, urlopen
 
 from .models import Campaign, CampaignEvent, EventType
 
+COLOR_UP = "warning"
+COLOR_DOWN = "info"
+COLOR_HIGH = "warning"
+
 
 class WeComNotifierError(RuntimeError):
     pass
@@ -70,18 +74,43 @@ def _format_event_lines(event: CampaignEvent) -> list[str]:
     campaign = event.current
     if event.event_type == EventType.NEW:
         suffix = ""
+        current_apy = format_apy(campaign)
     elif event.event_type == EventType.RATE_CHANGED and event.previous:
-        suffix = f"；利率 {format_apy(event.previous)} -> {format_apy(campaign)}"
+        color = rate_change_color(campaign.apy - event.previous.apy)
+        current_apy = colored(format_apy(campaign), color)
+        suffix = (
+            f"；利率 {format_apy(event.previous)} -> {colored(format_apy(campaign), color)}"
+            f"；变化 {colored(format_delta(campaign.apy - event.previous.apy), color)}"
+        )
     elif event.event_type == EventType.END_DATE_CHANGED and event.previous:
         suffix = f"；到期 {event.previous.end_date} -> {campaign.end_date}"
+        current_apy = format_apy(campaign)
     else:
         suffix = ""
+        current_apy = format_apy(campaign)
 
     return [
         f"- {campaign.protocol_name}｜{campaign.campaign_name}",
-        f"  代币：{campaign.asset_symbol}；到期：{campaign.end_date}；实时年化：{format_apy(campaign)}{suffix}",
+        f"  代币：{campaign.asset_symbol}；到期：{campaign.end_date}；实时年化：{current_apy}{suffix}",
     ]
 
 
 def format_apy(campaign: Campaign) -> str:
     return f"{campaign.apy:.2f}%"
+
+
+def format_percent(value: float) -> str:
+    return f"{value:.2f}%"
+
+
+def format_delta(value: float) -> str:
+    sign = "+" if value > 0 else ""
+    return f"{sign}{value:.2f}pct"
+
+
+def rate_change_color(delta: float) -> str:
+    return COLOR_UP if delta >= 0 else COLOR_DOWN
+
+
+def colored(text: str, color: str) -> str:
+    return f'<font color="{color}">{text}</font>'

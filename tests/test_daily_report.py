@@ -82,8 +82,10 @@ class DailyReportTest(unittest.TestCase):
         content = format_daily_report_markdown(report, 2.0, 8.0)
 
         self.assertIn("Barker 理财日报", content)
-        self.assertIn("8.00% -> 10.00%", content)
+        self.assertIn("8.00% ->", content)
         self.assertIn("当前 APY > 8.00%", content)
+        self.assertIn('<font color="warning">10.00%</font>', content)
+        self.assertIn('<font color="warning">上涨 2.00pct</font>', content)
 
     def test_limits_daily_report_items(self) -> None:
         now = datetime(2026, 6, 5, 10, 0, tzinfo=LOCAL_TZ)
@@ -99,7 +101,26 @@ class DailyReportTest(unittest.TestCase):
         content = format_daily_report_markdown(report, 2.0, 8.0)
 
         self.assertIn("当前 APY > 8.00%：12 条", content)
+        self.assertIn('<font color="warning">20.00%</font>', content)
         self.assertIn("... 还有 2 条未展示", content)
+
+    def test_formats_downward_move_in_info_color(self) -> None:
+        now = datetime(2026, 6, 5, 10, 0, tzinfo=LOCAL_TZ)
+        report = build_daily_report(
+            snapshots=[
+                {"timestamp": "2026-06-04T09:00:00+08:00", "campaigns": [campaign("down", 11.0).to_dict()]},
+                {"timestamp": "2026-06-04T23:00:00+08:00", "campaigns": [campaign("down", 8.0).to_dict()]},
+            ],
+            current_campaigns=[],
+            now=now,
+            change_threshold_points=2.0,
+            high_apy_threshold=8.0,
+        )
+
+        content = format_daily_report_markdown(report, 2.0, 8.0)
+
+        self.assertIn('<font color="info">8.00%</font>', content)
+        self.assertIn('<font color="info">下跌 3.00pct</font>', content)
 
 
 if __name__ == "__main__":
