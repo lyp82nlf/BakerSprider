@@ -6,6 +6,7 @@ import sys
 import time
 from datetime import datetime
 
+from . import __version__
 from .client import BarkerClient, BarkerClientError
 from .config import Config
 from .daily_report import LOCAL_TZ, build_daily_report, format_daily_report_markdown, should_send_daily_report
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Monitor Barker CEX campaigns.")
+    parser.add_argument("--version", action="version", version=f"barker-spider {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     once = subparsers.add_parser("once", help="Fetch once, compare state, notify if needed.")

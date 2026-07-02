@@ -24,7 +24,7 @@ class NotifierTest(unittest.TestCase):
         self.assertIn("Lorenzo USD1", content)
         self.assertIn("USD1", content)
         self.assertIn("2026-06-19 07:59", content)
-        self.assertIn("10.98%", content)
+        self.assertIn('<font color="warning">10.98%</font>', content)
 
     def test_rate_increase_highlights_current_rate_and_delta(self) -> None:
         previous = Campaign(
@@ -50,6 +50,7 @@ class NotifierTest(unittest.TestCase):
 
         content = format_events_markdown([CampaignEvent(EventType.RATE_CHANGED, current, previous)])
 
+        self.assertIn('<font color="warning">13.54%</font>', content)
         self.assertIn('<font color="warning">15.19%</font>', content)
         self.assertIn('<font color="warning">+1.65pct</font>', content)
 
@@ -77,6 +78,7 @@ class NotifierTest(unittest.TestCase):
 
         content = format_events_markdown([CampaignEvent(EventType.RATE_CHANGED, current, previous)])
 
+        self.assertIn('<font color="info">15.19%</font>', content)
         self.assertIn('<font color="info">13.54%</font>', content)
         self.assertIn('<font color="info">-1.65pct</font>', content)
 

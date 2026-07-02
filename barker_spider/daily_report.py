@@ -63,7 +63,8 @@ def format_daily_report_markdown(report: DailyReport, change_threshold_points: f
     lines = [f"### Barker 理财日报 {report.report_date.isoformat()}"]
 
     lines.append("")
-    lines.append(f"**昨日涨跌 >= {change_threshold_points:.2f} 个百分点：{len(report.rate_moves)} 条**")
+    change_threshold = colored(f"{change_threshold_points:.2f}", COLOR_HIGH)
+    lines.append(f"**昨日涨跌 >= {change_threshold} 个百分点：{len(report.rate_moves)} 条**")
     if report.rate_moves:
         shown_moves = report.rate_moves[:MAX_DAILY_REPORT_ITEMS]
         for index, move in enumerate(shown_moves, start=1):
@@ -71,7 +72,7 @@ def format_daily_report_markdown(report: DailyReport, change_threshold_points: f
             color = rate_change_color(move.delta)
             lines.append(f"{index}. {move.campaign.protocol_name}｜{move.campaign.campaign_name}")
             lines.append(
-                f"   {move.campaign.asset_symbol}｜{format_percent(move.start_apy)} -> "
+                f"   {move.campaign.asset_symbol}｜{colored(format_percent(move.start_apy), color)} -> "
                 f"{colored(format_percent(move.end_apy), color)}"
                 f"｜{colored(f'{direction} {abs(move.delta):.2f}pct', color)}"
             )
@@ -80,7 +81,8 @@ def format_daily_report_markdown(report: DailyReport, change_threshold_points: f
         lines.append("- 无")
 
     lines.append("")
-    lines.append(f"**当前 APY > {high_apy_threshold:.2f}%：{len(report.high_apy_campaigns)} 条**")
+    high_threshold = colored(format_percent(high_apy_threshold), COLOR_HIGH)
+    lines.append(f"**当前 APY > {high_threshold}：{len(report.high_apy_campaigns)} 条**")
     if report.high_apy_campaigns:
         shown_campaigns = report.high_apy_campaigns[:MAX_DAILY_REPORT_ITEMS]
         for index, campaign in enumerate(shown_campaigns, start=1):

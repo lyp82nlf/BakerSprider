@@ -74,20 +74,20 @@ def _format_event_lines(event: CampaignEvent) -> list[str]:
     campaign = event.current
     if event.event_type == EventType.NEW:
         suffix = ""
-        current_apy = format_apy(campaign)
+        current_apy = colored(format_apy(campaign), COLOR_HIGH)
     elif event.event_type == EventType.RATE_CHANGED and event.previous:
         color = rate_change_color(campaign.apy - event.previous.apy)
         current_apy = colored(format_apy(campaign), color)
         suffix = (
-            f"；利率 {format_apy(event.previous)} -> {colored(format_apy(campaign), color)}"
+            f"；利率 {colored(format_apy(event.previous), color)} -> {colored(format_apy(campaign), color)}"
             f"；变化 {colored(format_delta(campaign.apy - event.previous.apy), color)}"
         )
     elif event.event_type == EventType.END_DATE_CHANGED and event.previous:
         suffix = f"；到期 {event.previous.end_date} -> {campaign.end_date}"
-        current_apy = format_apy(campaign)
+        current_apy = colored(format_apy(campaign), COLOR_HIGH)
     else:
         suffix = ""
-        current_apy = format_apy(campaign)
+        current_apy = colored(format_apy(campaign), COLOR_HIGH)
 
     return [
         f"- {campaign.protocol_name}｜{campaign.campaign_name}",

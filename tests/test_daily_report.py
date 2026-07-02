@@ -82,8 +82,8 @@ class DailyReportTest(unittest.TestCase):
         content = format_daily_report_markdown(report, 2.0, 8.0)
 
         self.assertIn("Barker 理财日报", content)
-        self.assertIn("8.00% ->", content)
-        self.assertIn("当前 APY > 8.00%", content)
+        self.assertIn('<font color="warning">8.00%</font> ->', content)
+        self.assertIn('当前 APY > <font color="warning">8.00%</font>', content)
         self.assertIn('<font color="warning">10.00%</font>', content)
         self.assertIn('<font color="warning">上涨 2.00pct</font>', content)
 
@@ -100,7 +100,7 @@ class DailyReportTest(unittest.TestCase):
 
         content = format_daily_report_markdown(report, 2.0, 8.0)
 
-        self.assertIn("当前 APY > 8.00%：12 条", content)
+        self.assertIn('当前 APY > <font color="warning">8.00%</font>：12 条', content)
         self.assertIn('<font color="warning">20.00%</font>', content)
         self.assertIn("... 还有 2 条未展示", content)
 
