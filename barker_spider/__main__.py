@@ -10,7 +10,7 @@ from . import __version__
 from .client import BarkerClient, BarkerClientError
 from .config import Config
 from .daily_report import LOCAL_TZ, build_daily_report, format_daily_report_markdown, should_send_daily_report
-from .monitor import run_comparison
+from .monitor import advance_monitor_state, campaign_fingerprint, extract_source_updated_at
 from .normalizer import normalize_campaigns
 from .notifier import WeComNotifier, format_events_markdown
 from .printer import format_campaign_table
@@ -88,31 +88,55 @@ def run_once(config: Config, dry_run: bool = False) -> int:
 
     raw_campaigns = client.fetch_campaigns()
     campaigns = normalize_campaigns(raw_campaigns, only_active=config.only_active)
-    history.append_snapshot(datetime.now(LOCAL_TZ).isoformat(), campaigns)
-    previous = state.load()
+    observed_at = datetime.now(LOCAL_TZ)
+    monitor_state = state.load_monitor_state()
     has_baseline = state.exists()
-    events = run_comparison(
-        previous=previous,
+    if has_baseline and not state.has_monitor_state():
+        known_campaigns = history.load_latest_campaigns()
+        known_campaigns.update(monitor_state.baseline)
+        monitor_state.baseline = known_campaigns
+        logging.info("Migrated %s previously seen campaigns into the stable baseline", len(known_campaigns))
+    transition = advance_monitor_state(
+        state=monitor_state,
         current=campaigns,
         rate_threshold_points=config.rate_threshold_points,
+        observed_at=observed_at,
+        source_updated_at=extract_source_updated_at(raw_campaigns),
+        source_fingerprint=campaign_fingerprint(campaigns),
         has_baseline=has_baseline,
     )
-    state.save(campaigns)
+
+    if not transition.accepted:
+        logging.warning("Ignored Barker snapshot: %s", transition.reason)
+        maybe_send_scheduled_daily_report(
+            config,
+            list(transition.state.latest.values()),
+            dry_run=dry_run,
+        )
+        return 0
 
     if not has_baseline:
         logging.info("Created baseline with %s active campaigns", len(campaigns))
 
-    if events:
-        content = format_events_markdown(events)
+    if transition.events:
+        content = format_events_markdown(transition.events)
         if dry_run:
             print(content)
         else:
             WeComNotifier(config.wecom_webhook_url).send_markdown(content)
-            logging.info("Sent WeCom notification with %s events", len(events))
+            changed_campaigns = len({event.current.uid for event in transition.events})
+            logging.info("Sent WeCom notification with %s changed campaigns", changed_campaigns)
     else:
-        logging.info("No campaign changes detected; monitored %s active campaigns", len(campaigns))
+        logging.info("No confirmed campaign changes; observed %s active campaigns", len(campaigns))
 
-    maybe_send_scheduled_daily_report(config, campaigns, dry_run=dry_run)
+    state.save_monitor_state(transition.state)
+    history.append_snapshot(observed_at.isoformat(), campaigns)
+
+    maybe_send_scheduled_daily_report(
+        config,
+        list(transition.state.latest.values()),
+        dry_run=dry_run,
+    )
     return 0
 
 

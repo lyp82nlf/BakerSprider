@@ -51,48 +51,73 @@ class WeComNotifier:
 
 
 def format_events_markdown(events: list[CampaignEvent]) -> str:
-    lines = ["### Barker 理财监控提醒"]
-    groups = [
-        (EventType.NEW, "新增理财"),
-        (EventType.RATE_CHANGED, "利率变化"),
-        (EventType.END_DATE_CHANGED, "到期时间变化"),
-    ]
+    grouped = _group_events_by_campaign(events)
+    event_types = {event.event_type for event in events}
+    if event_types == {EventType.NEW}:
+        title = "### Barker 新增理财"
+    elif EventType.NEW not in event_types:
+        title = "### Barker 理财变动"
+    else:
+        title = "### Barker 理财更新"
 
-    for event_type, title in groups:
-        group_events = [event for event in events if event.event_type == event_type]
-        if not group_events:
-            continue
+    lines = [title]
+    for group in sorted(grouped, key=_event_group_sort_key):
         lines.append("")
-        lines.append(f"**{title}**")
-        for event in group_events:
-            lines.extend(_format_event_lines(event))
+        lines.extend(_format_event_group(group))
 
     return "\n".join(lines)
 
 
-def _format_event_lines(event: CampaignEvent) -> list[str]:
-    campaign = event.current
-    if event.event_type == EventType.NEW:
-        suffix = ""
-        current_apy = colored(format_apy(campaign), COLOR_HIGH)
-    elif event.event_type == EventType.RATE_CHANGED and event.previous:
-        color = rate_change_color(campaign.apy - event.previous.apy)
-        current_apy = colored(format_apy(campaign), color)
-        suffix = (
-            f"；利率 {colored(format_apy(event.previous), color)} -> {colored(format_apy(campaign), color)}"
-            f"；变化 {colored(format_delta(campaign.apy - event.previous.apy), color)}"
-        )
-    elif event.event_type == EventType.END_DATE_CHANGED and event.previous:
-        suffix = f"；到期 {event.previous.end_date} -> {campaign.end_date}"
-        current_apy = colored(format_apy(campaign), COLOR_HIGH)
-    else:
-        suffix = ""
-        current_apy = colored(format_apy(campaign), COLOR_HIGH)
+def _group_events_by_campaign(events: list[CampaignEvent]) -> list[list[CampaignEvent]]:
+    grouped: dict[str, list[CampaignEvent]] = {}
+    for event in events:
+        grouped.setdefault(event.current.uid, []).append(event)
+    return list(grouped.values())
 
-    return [
-        f"- {campaign.protocol_name}｜{campaign.campaign_name}",
-        f"  代币：{campaign.asset_symbol}；到期：{campaign.end_date}；实时年化：{current_apy}{suffix}",
-    ]
+
+def _event_group_sort_key(group: list[CampaignEvent]) -> tuple[int, float, str, str]:
+    campaign = group[0].current
+    by_type = {event.event_type: event for event in group}
+    if EventType.NEW in by_type:
+        return 0, -campaign.apy, campaign.protocol_name, campaign.campaign_name
+    rate_event = by_type.get(EventType.RATE_CHANGED)
+    if rate_event and rate_event.previous:
+        return 1, -abs(campaign.apy - rate_event.previous.apy), campaign.protocol_name, campaign.campaign_name
+    return 2, 0.0, campaign.protocol_name, campaign.campaign_name
+
+
+def _format_event_group(group: list[CampaignEvent]) -> list[str]:
+    campaign = group[0].current
+    by_type = {event.event_type: event for event in group}
+    lines = [f"**{campaign.protocol_name}｜{campaign.campaign_name}**"]
+
+    if EventType.NEW in by_type:
+        lines.append(
+            f"代币：{campaign.asset_symbol}｜APY：{colored(format_apy(campaign), COLOR_HIGH)}"
+            f"｜到期：{campaign.end_date}"
+        )
+        return lines
+
+    lines.append(f"代币：{campaign.asset_symbol}")
+    rate_event = by_type.get(EventType.RATE_CHANGED)
+    if rate_event and rate_event.previous:
+        delta = campaign.apy - rate_event.previous.apy
+        color = rate_change_color(delta)
+        lines.append(
+            f"APY：{colored(format_apy(rate_event.previous), color)} → "
+            f"{colored(format_apy(campaign), color)}（{colored(format_movement(delta), color)}）"
+        )
+
+    end_date_event = by_type.get(EventType.END_DATE_CHANGED)
+    if end_date_event and end_date_event.previous:
+        lines.append(f"到期：{end_date_event.previous.end_date} → {campaign.end_date}")
+    elif rate_event:
+        lines.append(f"到期：{campaign.end_date}")
+
+    if end_date_event and not rate_event:
+        lines.append(f"当前 APY：{colored(format_apy(campaign), COLOR_HIGH)}")
+
+    return lines
 
 
 def format_apy(campaign: Campaign) -> str:
@@ -106,6 +131,11 @@ def format_percent(value: float) -> str:
 def format_delta(value: float) -> str:
     sign = "+" if value > 0 else ""
     return f"{sign}{value:.2f}pct"
+
+
+def format_movement(value: float) -> str:
+    arrow = "↑" if value >= 0 else "↓"
+    return f"{arrow}{abs(value):.2f}pct"
 
 
 def rate_change_color(delta: float) -> str:
